@@ -27,8 +27,6 @@ async fn download(
         ctx.channel_id()
     };
 
-    let client = reqwest::Client::new();
-
     let mut tasks = vec![];
     let mut messages = channel.messages_iter(&ctx).boxed();
     while let Some(message_result) = messages.next().await {
@@ -38,45 +36,25 @@ async fn download(
                     continue;
                 }
 
-                let client = client.clone();
-
                 tasks.push(tokio::spawn(async move {
                     for attachment in m.attachments {
-                        let response = client.get(&attachment.url).send().await;
+                        let filename = format!(
+                            "{OUTPUT_DIR}/{}_{}",
+                            attachment.id.get(),
+                            attachment.filename
+                        );
 
-                        if response.is_err() {
-                            continue;
-                        }
-
-                        let response = response.unwrap();
-
-                        let filename = {
-                            let iter = attachment.url.split('/').collect::<Vec<_>>();
-                            let message_id = iter[iter.len() - 2];
-                            let og_filename = iter[iter.len() - 1];
-
-                            let mut filename = format!(
-                                "{OUTPUT_DIR}/{message_id}_{}",
-                                &og_filename[0..og_filename.find('?').unwrap()].to_string()
-                            );
-                            let mut i = 0;
-
-                            while std::path::Path::new(&format!("{filename}.png")).exists() {
-                                filename = format!("{filename} ({i})");
-                                i += 1;
+                        let download_result = attachment.download().await;
+                        match download_result {
+                            Ok(b) => {
+                                if let Err(e) = std::fs::write(filename, b) {
+                                    eprintln!("Save error: {e}");
+                                }
                             }
-
-                            filename
-                        };
-
-                        let bytes_result = response.bytes().await;
-                        if bytes_result.is_err() {
-                            continue;
+                            Err(e) => {
+                                eprintln!("Download error: {e}");
+                            }
                         }
-
-                        let bytes = bytes_result.unwrap();
-
-                        _ = std::fs::write(&filename, bytes);
                     }
                 }));
             }
