@@ -1,5 +1,5 @@
 [package]
-name = "utils-bot"
+name = "img-download-bot"
 version = "0.1.0"
 edition = "2021"
 

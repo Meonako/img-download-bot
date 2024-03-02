@@ -52,13 +52,17 @@ async fn download(
 
                         let filename = {
                             let iter = attachment.url.split('/').collect::<Vec<_>>();
-                            let og_filename = iter[iter.len() - 2];
+                            let message_id = iter[iter.len() - 2];
+                            let og_filename = iter[iter.len() - 1];
 
-                            let mut filename = format!("{OUTPUT_DIR}/{og_filename}.png");
+                            let mut filename = format!(
+                                "{OUTPUT_DIR}/{message_id}_{}",
+                                &og_filename[0..og_filename.find('?').unwrap()].to_string()
+                            );
                             let mut i = 0;
 
-                            while std::path::Path::new(&filename).exists() {
-                                filename = format!("{OUTPUT_DIR}/{} ({}).png", filename, i);
+                            while std::path::Path::new(&format!("{filename}.png")).exists() {
+                                filename = format!("{filename} ({i})");
                                 i += 1;
                             }
 
@@ -95,7 +99,14 @@ async fn download(
 
 #[tokio::main]
 async fn main() {
-    let token = std::env::var("LITTLE_KITTY").expect("missing LITTLE_KITTY");
+    let token = {
+        let mut args = std::env::args().collect::<Vec<_>>();
+        if args.len() > 1 {
+            args.remove(1)
+        } else {
+            std::env::var("LITTLE_KITTY").expect("missing LITTLE_KITTY")
+        }
+    };
     let intents = serenity::GatewayIntents::all();
 
     _ = std::fs::create_dir(OUTPUT_DIR);
